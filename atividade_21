@@ -1,0 +1,169 @@
+// Produto.ts
+class Produto {
+  private nome: string;
+  private codigo: string;
+  private preco: number;
+  private quantidade: number;
+
+  constructor(nome: string, codigo: string, preco: number, quantidade: number) {
+    this.nome = nome;
+    this.codigo = codigo;
+    this.preco = preco;
+    this.quantidade = quantidade;
+  }
+
+  getNome(): string {
+    return this.nome;
+  }
+
+  getCodigo(): string {
+    return this.codigo;
+  }
+
+  getPreco(): number {
+    return this.preco;
+  }
+
+  getQuantidade(): number {
+    return this.quantidade;
+  }
+
+  adicionarEstoque(qtd: number): void {
+    this.quantidade += qtd;
+  }
+
+  removerEstoque(qtd: number): void {
+    if (this.quantidade < qtd) {
+      throw new Error("Estoque insuficiente!");
+    }
+    this.quantidade -= qtd;
+  }
+}
+
+
+// Movimentacao.ts
+abstract class Movimentacao {
+  protected produto: Produto;
+  protected quantidade: number;
+  protected data: Date;
+
+  constructor(produto: Produto, quantidade: number) {
+    this.produto = produto;
+    this.quantidade = quantidade;
+    this.data = new Date();
+  }
+
+  abstract registrar(): void;
+}
+
+class Entrada extends Movimentacao {
+  registrar(): void {
+    this.produto.adicionarEstoque(this.quantidade);
+    console.log(`Entrada de ${this.quantidade} unidade(s) de ${this.produto.getNome()}`);
+  }
+}
+
+class Saida extends Movimentacao {
+  registrar(): void {
+    this.produto.removerEstoque(this.quantidade);
+    console.log(`Saída de ${this.quantidade} unidade(s) de ${this.produto.getNome()}`);
+  }
+}
+
+// Estoque.ts
+class Estoque {
+  private produtos: Map<string, Produto> = new Map();
+  private movimentacoes: Movimentacao[] = [];
+
+  cadastrarProduto(produto: Produto): void {
+    if (this.produtos.has(produto.getCodigo())) {
+      throw new Error("Produto já cadastrado!");
+    }
+    this.produtos.set(produto.getCodigo(), produto);
+  }
+
+  registrarMovimentacao(mov: Movimentacao): void {
+    mov.registrar();
+    this.movimentacoes.push(mov);
+  }
+
+  gerarRelatorio(): void {
+    console.log("\n=== Relatório de Estoque ===");
+    this.produtos.forEach(p => {
+      console.log(`${p.getCodigo()} - ${p.getNome()} | Qtd: ${p.getQuantidade()} | Preço: R$${p.getPreco()}`);
+    });
+  }
+
+  alertaEstoqueBaixo(minimo: number): void {
+    console.log("\n=== Alertas de Estoque ===");
+    this.produtos.forEach(p => {
+      if (p.getQuantidade() < minimo) {
+        console.log(` Estoque baixo para ${p.getNome()} (Qtd: ${p.getQuantidade()})`);
+      }
+    });
+  }
+}
+
+// index.ts (menu interativo simples via console)
+import * as readlineSync from "readline-sync";
+
+const estoque = new Estoque();
+
+function menu() {
+  while (true) {
+    console.log("\n=== Sistema de Estoque ===");
+    console.log("1 - Cadastrar Produto");
+    console.log("2 - Registrar Entrada");
+    console.log("3 - Registrar Saída");
+    console.log("4 - Relatório de Estoque");
+    console.log("5 - Sair");
+
+    const opcao = readlineSync.question("Escolha uma opção: ");
+
+    try {
+      switch (opcao) {
+        case "1":
+          const nome = readlineSync.question("Nome: ");
+          const codigo = readlineSync.question("Código: ");
+          const preco = Number(readlineSync.question("Preço: "));
+          const qtd = Number(readlineSync.question("Quantidade inicial: "));
+          estoque.cadastrarProduto(new Produto(nome, codigo, preco, qtd));
+          break;
+
+        case "2":
+          registrarMovimentacao("entrada");
+          break;
+
+        case "3":
+          registrarMovimentacao("saida");
+          break;
+
+        case "4":
+          estoque.gerarRelatorio();
+          estoque.alertaEstoqueBaixo(5);
+          break;
+
+        case "5":
+          return;
+      }
+    } catch (e) {
+      console.log(" Erro:", (e as Error).message);
+    }
+  }
+}
+
+function registrarMovimentacao(tipo: "entrada" | "saida") {
+  const codigo = readlineSync.question("Código do produto: ");
+  const qtd = Number(readlineSync.question("Quantidade: "));
+  const produto = (estoque as any).produtos.get(codigo);
+  if (!produto) throw new Error("Produto não encontrado!");
+
+  const mov =
+    tipo === "entrada"
+      ? new Entrada(produto, qtd)
+      : new Saida(produto, qtd);
+
+  estoque.registrarMovimentacao(mov);
+}
+
+menu();
